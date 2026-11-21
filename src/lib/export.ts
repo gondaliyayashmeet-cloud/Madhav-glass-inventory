@@ -218,98 +218,54 @@ export function exportManualBook(
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format });
   const pageWidth = doc.internal.pageSize.getWidth();
   const pageHeight = doc.internal.pageSize.getHeight();
-  const margin = 8;
+  const margin = 10;
   const contentWidth = pageWidth - margin * 2;
-  const bottomLimit = pageHeight - 8;
 
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(12);
-  doc.text(title, pageWidth / 2, 12, { align: 'center' });
+  groups.filter((group) => group.items.length > 0).forEach((group, groupIndex) => {
+    if (groupIndex > 0) doc.addPage();
 
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(7);
-  doc.setTextColor(110, 110, 110);
-  doc.text(new Date().toLocaleString('en-IN'), pageWidth / 2, 16, { align: 'center' });
-  doc.setTextColor(0, 0, 0);
+    const headingY = 24;
+    const listTop = 38;
+    const bottom = pageHeight - 12;
+    const availableHeight = bottom - listTop;
+    const lineSpacing = Math.max(5, Math.min(8, availableHeight / group.items.length));
 
-  let y = 21;
-
-  // We render each group as: a heading line, then a 2-column list (Size | Brand).
-  // Multiple sizes fit side-by-side; brand name printed next to its size.
-  for (const group of groups) {
-    if (group.items.length === 0) continue;
-
-    const headingHeight = 6;
-    const lineSpacing = 4.5;
-    const headingText = group.label;
-
-    // Determine space needed for this group
-    const linesNeeded = group.items.length;
-    const groupHeight = headingHeight + linesNeeded * lineSpacing + 4;
-
-    // Page break if not enough room (need at least heading + 2 lines)
-    if (y + headingHeight + 2 * lineSpacing > bottomLimit) {
-      doc.addPage();
-      y = 12;
-    }
-
-    // Heading bar
-    doc.setFillColor(37, 99, 235);
-    doc.rect(margin, y - 3.5, contentWidth, headingHeight - 0.5, 'F');
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(9);
-    doc.setTextColor(255, 255, 255);
-    doc.text(headingText, margin + 2, y + 0.5);
-    doc.setTextColor(0, 0, 0);
-
-    y += headingHeight;
-
-    // Size list in two sub-columns to fit more on a line
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(8);
-    const colWidth = contentWidth / 2;
-    const half = Math.ceil(group.items.length / 2);
-    const leftItems = group.items.slice(0, half);
-    const rightItems = group.items.slice(half);
+    doc.setTextColor(100, 100, 100);
+    doc.text(title, margin, 10);
+    doc.text(new Date().toLocaleDateString('en-IN'), pageWidth - margin, 10, { align: 'right' });
 
-    let lineY = y;
-    let li = 0;
-    while (li < leftItems.length || li < rightItems.length) {
-      if (lineY > bottomLimit) {
-        doc.addPage();
-        lineY = 12;
-      }
-      const left = leftItems[li];
-      const right = rightItems[li];
-      if (left) {
-        const sizeStr = left.size;
-        const brandStr = left.brand || '—';
-        doc.setFont('helvetica', 'bold');
-        doc.text(sizeStr, margin + 1, lineY);
-        const sizeW = doc.getTextWidth(sizeStr);
-        doc.setFont('helvetica', 'normal');
-        doc.setTextColor(70, 70, 70);
-        doc.text(brandStr, margin + 1 + sizeW + 2, lineY);
-        doc.setTextColor(0, 0, 0);
-      }
-      if (right) {
-        const sizeStr = right.size;
-        const brandStr = right.brand || '—';
-        const cx = margin + colWidth;
-        doc.setFont('helvetica', 'bold');
-        doc.text(sizeStr, cx + 1, lineY);
-        const sizeW = doc.getTextWidth(sizeStr);
-        doc.setFont('helvetica', 'normal');
-        doc.setTextColor(70, 70, 70);
-        doc.text(brandStr, cx + 1 + sizeW + 2, lineY);
-        doc.setTextColor(0, 0, 0);
-      }
-      lineY += lineSpacing;
-      li++;
-    }
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(16);
+    doc.setTextColor(0, 0, 0);
+    doc.text(group.label, margin, headingY);
+    doc.setDrawColor(30, 30, 30);
+    doc.setLineWidth(0.5);
+    doc.line(margin, headingY + 3, pageWidth - margin, headingY + 3);
 
-    y = lineY + 4;
-  }
+    doc.setFontSize(10);
+    group.items.forEach((item, index) => {
+      const y = listTop + index * lineSpacing;
+      const sizeText = item.size || '—';
+      const brandText = item.brand || '—';
+      const stockText = item.stock ? `${item.stock} ${item.unit}` : '';
+
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(0, 0, 0);
+      doc.text(sizeText, margin + 1, y);
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(65, 65, 65);
+      doc.text(brandText, margin + 32, y);
+      if (stockText) {
+        doc.setTextColor(100, 100, 100);
+        doc.text(stockText, pageWidth - margin - 1, y, { align: 'right' });
+      }
+      doc.setDrawColor(190, 190, 190);
+      doc.setLineWidth(0.2);
+      doc.line(margin, y + 2, margin + contentWidth, y + 2);
+    });
+  });
 
   doc.save(`${filename}.pdf`);
 }
