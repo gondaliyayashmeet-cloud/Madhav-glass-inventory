@@ -218,54 +218,124 @@ export function exportManualBook(
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format });
   const pageWidth = doc.internal.pageSize.getWidth();
   const pageHeight = doc.internal.pageSize.getHeight();
-  const margin = 10;
+  const margin = paperSize === 'a5' ? 8 : 12;
   const contentWidth = pageWidth - margin * 2;
+  const pageBottom = pageHeight - margin;
+  const headerHeight = paperSize === 'a5' ? 20 : 24;
+  const groupGap = paperSize === 'a5' ? 5 : 7;
+  const rowHeight = paperSize === 'a5' ? 8 : 9;
+  const tableHeaderHeight = paperSize === 'a5' ? 11 : 13;
+  const titleDate = new Date().toLocaleDateString('en-IN');
+  const usableGroups = groups.filter((group) => group.items.length > 0);
+  let cursorY = 0;
 
-  groups.filter((group) => group.items.length > 0).forEach((group, groupIndex) => {
-    if (groupIndex > 0) doc.addPage();
-
-    const headingY = 24;
-    const listTop = 38;
-    const bottom = pageHeight - 12;
-    const availableHeight = bottom - listTop;
-    const lineSpacing = Math.max(5, Math.min(8, availableHeight / group.items.length));
-
+  const drawPageHeader = () => {
     doc.setFont('helvetica', 'normal');
-    doc.setFontSize(8);
-    doc.setTextColor(100, 100, 100);
-    doc.text(title, margin, 10);
-    doc.text(new Date().toLocaleDateString('en-IN'), pageWidth - margin, 10, { align: 'right' });
+    doc.setFontSize(paperSize === 'a5' ? 7 : 8);
+    doc.setTextColor(90, 90, 90);
+    doc.text(title, pageWidth / 2, margin + 4, { align: 'center' });
+    doc.text(titleDate, pageWidth - margin, margin + 4, { align: 'right' });
+    cursorY = margin + headerHeight;
+  };
+
+  const startPage = (firstPage: boolean) => {
+    if (!firstPage) doc.addPage();
+    drawPageHeader();
+  };
+
+  const drawGroup = (group: ManualGroup) => {
+    const brands = [...new Set(group.items.map((item) => item.brand.trim()).filter(Boolean))];
+    const sizes = [...new Set(group.items.map((item) => item.size.trim()).filter(Boolean))];
+    if (brands.length === 0 || sizes.length === 0) return;
+
+    const sizeColumnWidth = Math.min(paperSize === 'a5' ? 31 : 40, contentWidth * 0.3);
+    const brandColumnWidth = (contentWidth - sizeColumnWidth) / brands.length;
+    const groupTitleHeight = paperSize === 'a5' ? 8 : 10;
+    const tableHeight = groupTitleHeight + tableHeaderHeight + sizes.length * rowHeight;
+    const availableHeight = pageBottom - cursorY;
+
+    if (availableHeight < tableHeight && cursorY > margin + headerHeight) {
+      startPage(false);
+    }
 
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(16);
-    doc.setTextColor(0, 0, 0);
-    doc.text(group.label, margin, headingY);
-    doc.setDrawColor(30, 30, 30);
-    doc.setLineWidth(0.5);
-    doc.line(margin, headingY + 3, pageWidth - margin, headingY + 3);
+    doc.setFontSize(paperSize === 'a5' ? 10 : 12);
+    doc.setTextColor(20, 35, 75);
+    doc.text(group.label, margin, cursorY + groupTitleHeight - 2);
+    cursorY += groupTitleHeight;
 
-    doc.setFontSize(10);
-    group.items.forEach((item, index) => {
-      const y = listTop + index * lineSpacing;
-      const sizeText = item.size || '—';
-      const brandText = item.brand || '—';
-      const stockText = item.stock ? `${item.stock} ${item.unit}` : '';
+    const top = cursorY;
+    const bottom = top + tableHeaderHeight + sizes.length * rowHeight;
+    const tableLeft = margin;
+    const sizeRight = tableLeft + sizeColumnWidth;
 
+    doc.setDrawColor(45, 65, 125);
+    doc.setLineWidth(0.35);
+    doc.line(tableLeft, top, margin + contentWidth, top);
+    doc.line(tableLeft, bottom, margin + contentWidth, bottom);
+    doc.line(tableLeft, top, tableLeft, bottom);
+    doc.line(sizeRight, top, sizeRight, bottom);
+
+    brands.forEach((brand, index) => {
+      const x = sizeRight + index * brandColumnWidth;
+      const right = x + brandColumnWidth;
+      doc.line(right, top, right, bottom);
       doc.setFont('helvetica', 'bold');
-      doc.setTextColor(0, 0, 0);
-      doc.text(sizeText, margin + 1, y);
-      doc.setFont('helvetica', 'normal');
-      doc.setTextColor(65, 65, 65);
-      doc.text(brandText, margin + 32, y);
-      if (stockText) {
-        doc.setTextColor(100, 100, 100);
-        doc.text(stockText, pageWidth - margin - 1, y, { align: 'right' });
-      }
-      doc.setDrawColor(190, 190, 190);
-      doc.setLineWidth(0.2);
-      doc.line(margin, y + 2, margin + contentWidth, y + 2);
+      doc.setFontSize(paperSize === 'a5' ? 7 : 8);
+      doc.setTextColor(25, 45, 105);
+      const lines = doc.splitTextToSize(brand, brandColumnWidth - 2);
+      doc.text(lines.slice(0, 2), x + brandColumnWidth / 2, top + 4, { align: 'center' });
     });
-  });
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(paperSize === 'a5' ? 8 : 9);
+    doc.setTextColor(25, 45, 105);
+    doc.text('Size', tableLeft + 2, top + tableHeaderHeight / 2 + 1.5);
+    doc.line(tableLeft, top + tableHeaderHeight, margin + contentWidth, top + tableHeaderHeight);
+
+    const stockByCell = new Map<string, string>();
+    for (const item of group.items) {
+      const key = `${item.size.trim()}\\u0000${item.brand.trim()}`;
+      const current = stockByCell.get(key);
+      const next = item.stock.trim();
+      if (!current) {
+        stockByCell.set(key, next);
+      } else if (current !== next) {
+        const currentNumber = Number(current);
+        const nextNumber = Number(next);
+        stockByCell.set(key, Number.isFinite(currentNumber) && Number.isFinite(nextNumber)
+          ? String(currentNumber + nextNumber)
+          : `${current}, ${next}`);
+      }
+    }
+
+    sizes.forEach((size, rowIndex) => {
+      const rowTop = top + tableHeaderHeight + rowIndex * rowHeight;
+      const baseline = rowTop + rowHeight / 2 + 1.5;
+      doc.line(tableLeft, rowTop + rowHeight, margin + contentWidth, rowTop + rowHeight);
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(paperSize === 'a5' ? 8 : 9);
+      doc.setTextColor(25, 45, 105);
+      doc.text(size, tableLeft + 2, baseline);
+
+      brands.forEach((brand, brandIndex) => {
+        const value = stockByCell.get(`${size}\\u0000${brand}`);
+        if (!value) return;
+        const x = sizeRight + brandIndex * brandColumnWidth + brandColumnWidth / 2;
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(paperSize === 'a5' ? 9 : 10);
+        doc.setTextColor(25, 45, 105);
+        doc.text(value, x, baseline, { align: 'center' });
+      });
+    });
+
+    cursorY = bottom + groupGap;
+  };
+
+  if (usableGroups.length > 0) {
+    startPage(true);
+    usableGroups.forEach(drawGroup);
+  }
 
   doc.save(`${filename}.pdf`);
 }

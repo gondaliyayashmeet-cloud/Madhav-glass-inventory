@@ -273,7 +273,7 @@ export default function Reports() {
   const ledgerCustomer = customers.find((c) => String(c.id) === ledgerCustomerId);
 
   const isLoading = tab === 'sales' ? salesLoading : tab === 'ledger' ? ledgerLoading : tab === 'low-stock' ? lowStockLoading : inventoryLoading;
-  const currentRows = tab === 'sales' ? salesRows : tab === 'ledger' ? ledgerRows : tab === 'low-stock' ? lowStockRows : inventoryRows;
+  const currentRows: Record<string, any>[] = tab === 'sales' ? salesRows : tab === 'ledger' ? ledgerRows : tab === 'low-stock' ? lowStockRows : inventoryRows;
   const currentColumns = tab === 'sales' ? salesColumns : tab === 'ledger' ? ledgerColumns : tab === 'low-stock' ? lowStockColumns : inventoryColumns;
   const filename = tab === 'sales' ? 'sales-report' : tab === 'ledger' ? `ledger-${ledgerCustomer?.name ?? 'customer'}` : tab === 'low-stock' ? 'low-stock-report' : 'inventory-report';
   const reportTitle = tab === 'sales' ? 'Sales Report' : tab === 'ledger' ? `Customer Ledger - ${ledgerCustomer?.name ?? ''}` : tab === 'low-stock' ? 'Low Stock Report' : 'Full Inventory Report';

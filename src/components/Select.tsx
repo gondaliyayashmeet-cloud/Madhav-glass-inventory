@@ -4,6 +4,7 @@ import {
   useState,
   useEffect,
   useRef,
+  type MutableRefObject,
   type ReactNode,
 } from 'react';
 
@@ -12,7 +13,7 @@ interface SelectContextValue {
   setValue: (v: string) => void;
   open: boolean;
   setOpen: (o: boolean) => void;
-  labelsRef: React.MutableRef<Record<string, string>>;
+  labelsRef: MutableRefObject<Record<string, string>>;
   activeIndex: number;
   setActiveIndex: (n: number | ((prev: number) => number)) => void;
   onEnter?: () => void;
@@ -68,7 +69,7 @@ export function Select({
   const setRef = (el: HTMLDivElement | null) => {
     internalRef.current = el;
     if (typeof containerRef === 'function') containerRef(el);
-    else if (containerRef) (containerRef as React.MutableRefObject<HTMLDivElement | null>).current = el;
+    else if (containerRef) (containerRef as MutableRefObject<HTMLDivElement | null>).current = el;
   };
 
   return (
